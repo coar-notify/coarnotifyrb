@@ -1,127 +1,163 @@
-require 'uri'
+# This module provides validation functions for COAR Notify properties
 
-# Module to provide validation functions and a Validator class
-module Validate
-  REQUIRED_MESSAGE = "`%{x}` is a required field"
+module COARNotify
+  module Validate
+    REQUIRED_MESSAGE = "`%{x}` is a required field".freeze
 
-  class Validator
-    # @param rules [Hash] A hash containing validation rules
-    def initialize(rules)
-      @rules = rules
-    end
-
-    # @param property [String, Array<String>] The property to get the validation function for
-    # @param context [String, Array<String>, nil] The context in which the property is being validated
-    # @return [Proc, nil] A callable validation function or nil if not found
-    def get(property, context = nil)
-      default = @rules.dig(property, :default)
-      if context
-        specific = @rules.dig(property, :context, context, :default)
-        return specific if specific
+    class Validator
+      def initialize(rules)
+        @rules = rules
       end
-      default
-    end
 
-    # @return [Hash] The ruleset
-    def rules
-      @rules
-    end
+      def get(property, context = nil)
+        default = @rules.dig(property, "default")
+        return default if context.nil?
 
-    # @param new_rules [Hash] New rules to merge into the existing ruleset
-    def add_rules(new_rules)
-      @rules = merge_dicts_recursive(@rules, new_rules)
-    end
+        specific = @rules.dig(property, "context", context, "default")
+        specific || default
+      end
 
-    private
+      def rules
+        @rules
+      end
 
-    # @param hash1 [Hash] The first hash to merge
-    # @param hash2 [Hash] The second hash to merge
-    # @return [Hash] The merged hash
-    def merge_dicts_recursive(hash1, hash2)
-      hash1.merge(hash2) do |key, old_val, new_val|
-        old_val.is_a?(Hash) && new_val.is_a?(Hash) ? merge_dicts_recursive(old_val, new_val) : new_val
+      def add_rules(new_rules)
+        @rules = deep_merge(@rules, new_rules)
+      end
+
+      private
+
+      def deep_merge(hash1, hash2)
+        hash1.merge(hash2) do |key, old_val, new_val|
+          if old_val.is_a?(Hash) && new_val.is_a?(Hash)
+            deep_merge(old_val, new_val)
+          else
+            new_val
+          end
+        end
       end
     end
-  end
 
-  #############################################
-  ## URI validator
+    # URI validation patterns
+    URI_RE = /^(([^:\/?#]+):)?(\/\/([^\/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?/
+    SCHEME = /^[a-zA-Z][a-zA-Z0-9+\-.]*$/
+    IPV6 = /(?:^|(?<=\s))\[{0,1}(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))]{0,1}(?=\s|$)/
 
-  # @param obj [Object] The object being validated
-  # @param uri [String] The URI to validate
-  # @return [Boolean] True if the URI is valid, otherwise raises an error
-  def self.absolute_uri(obj, uri)
-    parsed_uri = URI.parse(uri)
-    raise ArgumentError, "Invalid URI" unless parsed_uri.absolute?
+    HOSTPORT = /
+      ^(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)| # domain
+      localhost| # localhost
+      \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}| # ipv4
+      (?:^|(?<=\s))(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))(?=\s|$)
+      )(?::\d+)?$/ix # optional port
 
-    # Validate scheme
-    scheme = parsed_uri.scheme
-    raise ArgumentError, "Invalid URI scheme `#{scheme}`" unless scheme =~ /^[a-zA-Z][a-zA-Z0-9+\-.]*$/
+    MARK = "-_.!~*'()"
+    UNRESERVED = "a-zA-Z0-9#{MARK}"
+    PCHARS = "#{UNRESERVED}:@&=+$,%/"
+    PATH = /^\/{0,1}[#{PCHARS}]*$/
 
-    # Validate authority
-    authority = parsed_uri.host
-    raise ArgumentError, "Invalid URI authority `#{authority}`" if authority.nil? || authority.empty?
+    RESERVED = ";/?:@&=+$,"
+    URIC = "#{RESERVED}#{UNRESERVED}%"
+    FREE = /^[#{URIC}]+$/
 
-    # Validate path, query, and fragment
-    # ...existing code for path, query, and fragment validation...
-    true
-  rescue URI::InvalidURIError
-    raise ArgumentError, "Invalid URI"
-  end
+    USERINFO = /^[#{UNRESERVED}%;:&=+$,]*$/
 
-  # @param obj [Object] The object being validated
-  # @param url [String] The URL to validate
-  # @return [Boolean] True if the URL is valid, otherwise raises an error
-  def self.url(obj, url)
-    absolute_uri(obj, url)
-    parsed_url = URI.parse(url)
-    raise ArgumentError, "URL scheme must be http or https" unless %w[http https].include?(parsed_url.scheme)
-    raise ArgumentError, "Does not appear to be a valid URL" if parsed_url.host.nil? || parsed_url.host.empty?
-    true
-  end
+    def self.absolute_uri(obj, uri)
+      m = URI_RE.match(uri)
+      raise "Invalid URI" unless m
 
-  # @param values [Array<String>] The list of valid values
-  # @return [Proc] A validation function
-  def self.one_of(values)
-    lambda do |obj, x|
-      raise ArgumentError, "`#{x}` is not one of the valid values: #{values}" unless values.include?(x)
+      # URI must be absolute, so requires a scheme
+      raise "URI requires a scheme" unless m[2]
+
+      scheme = m[2]
+      authority = m[4]
+      path = m[5]
+      query = m[7]
+      fragment = m[9]
+
+      # Validate scheme
+      raise "Invalid URI scheme `#{scheme}`" if scheme && !SCHEME.match(scheme)
+
+      if authority
+        userinfo, hostport = authority.split("@", 2) if authority.include?("@")
+        hostport ||= authority
+
+        if userinfo && !USERINFO.match(userinfo)
+          raise "Invalid URI authority `#{authority}`"
+        end
+
+        # Handle IPv6 addresses
+        if hostport.start_with?("[")
+          port_separator = hostport.rindex("]:")
+          if port_separator
+            port = hostport[port_separator+2..-1]
+            host = hostport[1...port_separator]
+          else
+            host = hostport[1...-1]
+          end
+          raise "Invalid URI authority `#{authority}`" unless IPV6.match(host)
+          if port
+            begin
+              Integer(port)
+            rescue ArgumentError
+              raise "Invalid URI port `#{port}`"
+            end
+          end
+        else
+          raise "Invalid URI authority `#{authority}`" unless HOSTPORT.match(hostport)
+        end
+      end
+
+      raise "Invalid URI path `#{path}`" if path && !PATH.match(path)
+      raise "Invalid URI query `#{query}`" if query && !FREE.match(query)
+      raise "Invalid URI fragment `#{fragment}`" if fragment && !FREE.match(fragment)
+
       true
     end
-  end
 
-  # @param values [Array<String>] The list of valid values
-  # @return [Proc] A validation function
-  def self.at_least_one_of(values)
-    lambda do |obj, x|
-      x = [x] unless x.is_a?(Array)
-      return true if (x & values).any?
-
-      raise ArgumentError, "`#{x}` does not contain at least one of the valid values: #{values}"
+    def self.url(obj, url)
+      absolute_uri(obj, url)
+      uri = URI.parse(url)
+      raise "URL scheme must be http or https" unless ["http", "https"].include?(uri.scheme)
+      raise "Invalid URL" if uri.host.nil? || uri.host.empty?
+      true
+    rescue URI::InvalidURIError
+      raise "Invalid URL"
     end
-  end
 
-  # @param value [String] The required value
-  # @return [Proc] A validation function
-  def self.contains(value)
-    values = [value].flatten.to_set
-    lambda do |obj, x|
-      x = [x].flatten.to_set
-      raise ArgumentError, "`#{x}` does not contain the required value(s): #{values}" unless values.subset?(x)
+    def self.one_of(values)
+      ->(obj, x) do
+        unless values.include?(x)
+          raise "`#{x}` is not one of the valid values: #{values}"
+        end
+        true
+      end
+    end
+
+    def self.at_least_one_of(values)
+      ->(obj, x) do
+        x = [x] unless x.is_a?(Array)
+        return true if x.any? { |v| values.include?(v) }
+        raise "`#{x}` is not one of the valid values: #{values}"
+      end
+    end
+
+    def self.contains(value)
+      values = Array(value).to_set
+
+      ->(obj, x) do
+        x = Array(x).to_set
+        return true if values.subset?(x)
+        raise "`#{x}` does not contain the required value(s): #{values.to_a}"
+      end
+    end
+
+    def self.type_checker(obj, value)
+      if obj.respond_to?(:allowed_types) && !obj.allowed_types.empty?
+        one_of(obj.allowed_types).call(obj, value)
+      elsif obj.respond_to?(:type)
+        contains(obj.type).call(obj, value)
+      end
       true
     end
-  end
-
-  # @param obj [Object] The object being validated
-  # @param value [Object] The value to validate
-  # @return [Boolean] True if the type is valid, otherwise raises an error
-  def self.type_checker(obj, value)
-    if obj.respond_to?(:ALLOWED_TYPES) && !obj.ALLOWED_TYPES.empty?
-      validator = one_of(obj.ALLOWED_TYPES)
-      validator.call(obj, value)
-    elsif obj.respond_to?(:TYPE)
-      validator = contains(obj.TYPE)
-      validator.call(obj, value)
-    end
-    true
   end
 end
