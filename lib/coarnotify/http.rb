@@ -1,78 +1,148 @@
-# HTTP layer interface and default implementation using Net::HTTP
+# frozen_string_literal: true
+
 require 'net/http'
 require 'uri'
 
-module COARNotify
-  module HttpLayer
+module Coarnotify
+  # HTTP layer interface and default implementation using Net::HTTP
+  module Http
     # Interface for the HTTP layer
-    def post(url, data, headers = {})
-      raise NotImplementedError, "#{self.class} must implement post method"
+    #
+    # This defines the methods which need to be implemented in order for the client to fully operate
+    class HttpLayer
+      # Make an HTTP POST request to the supplied URL with the given body data, and headers
+      #
+      # args and kwargs can be used to pass implementation-specific parameters
+      #
+      # @param url [String] the request URL
+      # @param data [String] the body data
+      # @param headers [Hash] HTTP headers as a hash to include in the request
+      # @param args [Array] argument list to pass on to the implementation
+      # @param kwargs [Hash] keyword arguments to pass on to the implementation
+      # @return [HttpResponse] the HTTP response
+      def post(url, data, headers = {}, *args, **kwargs)
+        raise NotImplementedError
+      end
+
+      # Make an HTTP GET request to the supplied URL with the given headers
+      #
+      # args and kwargs can be used to pass implementation-specific parameters
+      #
+      # @param url [String] the request URL
+      # @param headers [Hash] HTTP headers as a hash to include in the request
+      # @param args [Array] argument list to pass on to the implementation
+      # @param kwargs [Hash] keyword arguments to pass on to the implementation
+      # @return [HttpResponse] the HTTP response
+      def get(url, headers = {}, *args, **kwargs)
+        raise NotImplementedError
+      end
     end
 
-    def get(url, headers = {})
-      raise NotImplementedError, "#{self.class} must implement get method"
-    end
-  end
+    # Interface for the HTTP response object
+    #
+    # This defines the methods which need to be implemented in order for the client to fully operate
+    class HttpResponse
+      # Get the value of a header from the response
+      #
+      # @param header_name [String] the name of the header
+      # @return [String] the header value
+      def header(header_name)
+        raise NotImplementedError
+      end
 
-  module HttpResponse
-    # Interface for HTTP responses
-    def header(name)
-      raise NotImplementedError, "#{self.class} must implement header method"
-    end
-
-    def status_code
-      raise NotImplementedError, "#{self.class} must implement status_code method"
-    end
-  end
-
-  # Default implementation using Net::HTTP
-  class NetHttpLayer
-    include HttpLayer
-
-    def post(url, data, headers = {})
-      uri = URI.parse(url)
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = uri.scheme == 'https'
-
-      request = Net::HTTP::Post.new(uri.request_uri)
-      headers.each { |k, v| request[k] = v }
-      request.body = data
-
-      response = http.request(request)
-      NetHttpResponse.new(response)
+      # Get the status code of the response
+      #
+      # @return [Integer] the status code
+      def status_code
+        raise NotImplementedError
+      end
     end
 
-    def get(url, headers = {})
-      uri = URI.parse(url)
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = uri.scheme == 'https'
+    #######################################
+    ## Implementations using Net::HTTP
 
-      request = Net::HTTP::Get.new(uri.request_uri)
-      headers.each { |k, v| request[k] = v }
+    # Implementation of the HTTP layer using Net::HTTP. This is the default implementation
+    # used when no other implementation is supplied
+    class NetHttpLayer < HttpLayer
+      # Make an HTTP POST request to the supplied URL with the given body data, and headers
+      #
+      # args and kwargs can be used to pass additional parameters to the Net::HTTP request,
+      # such as authentication credentials, etc.
+      #
+      # @param url [String] the request URL
+      # @param data [String] the body data
+      # @param headers [Hash] HTTP headers as a hash to include in the request
+      # @param args [Array] argument list (unused in this implementation)
+      # @param kwargs [Hash] keyword arguments (unused in this implementation)
+      # @return [NetHttpResponse] the HTTP response
+      def post(url, data, headers = {}, *args, **kwargs)
+        uri = URI.parse(url)
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = (uri.scheme == 'https')
 
-      response = http.request(request)
-      NetHttpResponse.new(response)
+        request = Net::HTTP::Post.new(uri.request_uri)
+        headers.each { |key, value| request[key] = value }
+        request.body = data
+
+        response = http.request(request)
+        NetHttpResponse.new(response)
+      end
+
+      # Make an HTTP GET request to the supplied URL with the given headers
+      #
+      # args and kwargs can be used to pass additional parameters to the Net::HTTP request,
+      # such as authentication credentials, etc.
+      #
+      # @param url [String] the request URL
+      # @param headers [Hash] HTTP headers as a hash to include in the request
+      # @param args [Array] argument list (unused in this implementation)
+      # @param kwargs [Hash] keyword arguments (unused in this implementation)
+      # @return [NetHttpResponse] the HTTP response
+      def get(url, headers = {}, *args, **kwargs)
+        uri = URI.parse(url)
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = (uri.scheme == 'https')
+
+        request = Net::HTTP::Get.new(uri.request_uri)
+        headers.each { |key, value| request[key] = value }
+
+        response = http.request(request)
+        NetHttpResponse.new(response)
+      end
     end
-  end
 
-  class NetHttpResponse
-    include HttpResponse
+    # Implementation of the HTTP response object using Net::HTTP
+    #
+    # This wraps the Net::HTTP response object and provides the interface required by the client
+    class NetHttpResponse < HttpResponse
+      # Construct the object as a wrapper around the original Net::HTTP response object
+      #
+      # @param resp [Net::HTTPResponse] response object from Net::HTTP
+      def initialize(resp)
+        @resp = resp
+      end
 
-    def initialize(response)
-      @response = response
-    end
+      # Get the value of a header from the response
+      #
+      # @param header_name [String] the name of the header
+      # @return [String] the header value
+      def header(header_name)
+        @resp[header_name]
+      end
 
-    def header(name)
-      @response[name]
-    end
+      # Get the status code of the response
+      #
+      # @return [Integer] the status code
+      def status_code
+        @resp.code.to_i
+      end
 
-    def status_code
-      @response.code.to_i
-    end
-
-    # Additional access to raw response
-    def raw_response
-      @response
+      # Get the original Net::HTTP response object
+      #
+      # @return [Net::HTTPResponse] the original response object
+      def net_http_response
+        @resp
+      end
     end
   end
 end
