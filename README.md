@@ -1,4 +1,4 @@
-# COAR Notify Ruby
+# COAR Notify
 
 A Ruby implementation of the [COAR Notify protocol](https://coar-notify.net/) for scholarly communication notifications.
 
@@ -168,7 +168,7 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/coar-notify/coarnotifyrb.
+Bug reports and pull requests are welcome on GitHub at https://github.com/CottageLabs/coarnotifyrb.
 
 ## License
 
