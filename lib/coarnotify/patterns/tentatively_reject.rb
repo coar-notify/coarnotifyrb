@@ -1,43 +1,40 @@
-module COARNotify
-    module Patterns
-      # Pattern to represent a Tentative Reject notification
-      # https://coar-notify.net/specification/1.0.0/tentative-reject/
-      class TentativelyReject < NotifyPattern
-        include NestedPatternObjectMixin
-        include SummaryMixin
-  
-        # Tentative Reject type (ActivityStreams Tentative Reject type)
-        TYPE = ActivityStreamsTypes::TENTATIVE_REJECT
-  
-        # Validates the TentativelyReject pattern with additional constraints:
-        # - inReplyTo property is required
-        # - inReplyTo value must match object.id value
-        #
-        # @return [Boolean] true if valid
-        # @raise [ValidationError] if validation fails
-        def validate
-          ve = ValidationError.new
-          begin
-            super
-          rescue ValidationError => superve
-            ve = superve
-          end
-  
-          # Validate inReplyTo presence
-          required_and_validate(ve, Properties::IN_REPLY_TO, in_reply_to)
-  
-          # Validate inReplyTo matches object.id
-          obj_id = object ? object.id : nil
-          if in_reply_to != obj_id
-            ve.add_error(
-              Properties::IN_REPLY_TO,
-              "Expected inReplyTo to match object.id. inReplyTo: #{in_reply_to}, object.id: #{obj_id}"
-            )
-          end
-  
-          raise ve if ve.has_errors?
-          true
+# frozen_string_literal: true
+
+require_relative '../core/notify'
+require_relative '../core/activity_streams2'
+require_relative '../exceptions'
+
+module Coarnotify
+  module Patterns
+    # Pattern to represent a TentativelyReject notification
+    # https://coar-notify.net/specification/1.0.0/tentative-reject/
+    class TentativelyReject < Core::Notify::NotifyPattern
+      include Core::Notify::NestedPatternObjectMixin
+      include Core::Notify::SummaryMixin
+
+      def self.type_constant
+        Core::ActivityStreams2::ActivityStreamsTypes::TENTATIVE_REJECT
+      end
+
+      def validate
+        ve = ValidationError.new
+        begin
+          super
+        rescue ValidationError => superve
+          ve = superve
         end
+
+        required_and_validate(ve, Core::ActivityStreams2::Properties::IN_REPLY_TO, in_reply_to)
+
+        objid = object&.id
+        if in_reply_to != objid
+          ve.add_error(Core::ActivityStreams2::Properties::IN_REPLY_TO,
+                       "Expected inReplyTo id to be the same as the nested object id. inReplyTo: #{in_reply_to}, object.id: #{objid}")
+        end
+
+        raise ve if ve.has_errors?
+        true
       end
     end
   end
+end

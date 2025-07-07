@@ -1,43 +1,51 @@
-module COARNotify
-    module Patterns
-      # Pattern to represent a Reject notification
-      # https://coar-notify.net/specification/1.0.0/reject/
-      class Reject < NotifyPattern
-        include NestedPatternObjectMixin
-        include SummaryMixin
-  
-        # Reject type (ActivityStreams Reject type)
-        TYPE = ActivityStreamsTypes::REJECT
-  
-        # Validates the Reject pattern with additional constraints:
-        # - inReplyTo property is required
-        # - inReplyTo value must match object.id value
-        #
-        # @return [Boolean] true if valid
-        # @raise [ValidationError] if validation fails
-        def validate
-          ve = ValidationError.new
-          begin
-            super
-          rescue ValidationError => superve
-            ve = superve
-          end
-  
-          # Validate inReplyTo presence
-          required_and_validate(ve, Properties::IN_REPLY_TO, in_reply_to)
-  
-          # Validate inReplyTo matches object.id
-          obj_id = object ? object.id : nil
-          if in_reply_to != obj_id
-            ve.add_error(
-              Properties::IN_REPLY_TO,
-              "Expected inReplyTo to match object.id. inReplyTo: #{in_reply_to}, object.id: #{obj_id}"
-            )
-          end
-  
-          raise ve if ve.has_errors?
-          true
+# frozen_string_literal: true
+
+require_relative '../core/notify'
+require_relative '../core/activity_streams2'
+require_relative '../exceptions'
+
+module Coarnotify
+  module Patterns
+    # Pattern to represent a Reject notification
+    # https://coar-notify.net/specification/1.0.0/reject/
+    class Reject < Core::Notify::NotifyPattern
+      include Core::Notify::NestedPatternObjectMixin
+      include Core::Notify::SummaryMixin
+
+      # The Reject type
+      def self.type_constant
+        Core::ActivityStreams2::ActivityStreamsTypes::REJECT
+      end
+
+      # Validate the Reject pattern.
+      #
+      # In addition to the base validation, this:
+      #
+      # * Makes inReplyTo required
+      # * Requires the inReplyTo value to be the same as the object.id value
+      #
+      # @return [Boolean] true if valid, otherwise raises ValidationError
+      def validate
+        ve = ValidationError.new
+        begin
+          super
+        rescue ValidationError => superve
+          ve = superve
         end
+
+        # Technically, no need to validate the value, as this is handled by the superclass,
+        # but leaving it in for completeness
+        required_and_validate(ve, Core::ActivityStreams2::Properties::IN_REPLY_TO, in_reply_to)
+
+        objid = object&.id
+        if in_reply_to != objid
+          ve.add_error(Core::ActivityStreams2::Properties::IN_REPLY_TO,
+                       "Expected inReplyTo id to be the same as the nested object id. inReplyTo: #{in_reply_to}, object.id: #{objid}")
+        end
+
+        raise ve if ve.has_errors?
+        true
       end
     end
   end
+end

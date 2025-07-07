@@ -1,74 +1,82 @@
-# coarnotify/patterns/announce_relationship.rb
-module COARNotify
-    module Patterns
-      # Pattern to represent an Announce Relationship notification
-      # https://coar-notify.net/specification/1.0.0/announce-relationship/
-      class AnnounceRelationship < NotifyPattern
-        # Announce Relationship types including ActivityStreams announce and COAR Notify Relationship Action
-        TYPE = [ActivityStreamsTypes::ANNOUNCE, NotifyTypes::RELATIONSHIP_ACTION]
-  
-        # Custom getter to retrieve the object property as an AnnounceRelationshipObject
-        #
-        # @return [AnnounceRelationshipObject, nil] The relationship object
-        def object
-          o = get_property(Properties::OBJECT)
-          if o
-            AnnounceRelationshipObject.new(
-              o,
-              validate_stream_on_construct: false,
-              validate_properties: validate_properties,
-              validators: validators,
-              validation_context: Properties::OBJECT,
-              properties_by_reference: @properties_by_reference
-            )
-          end
-        end
-  
-        # Extends base validation to make context required
-        #
-        # @return [Boolean] true if valid
-        # @raise [ValidationError] if validation fails
-        def validate
-          ve = ValidationError.new
-          begin
-            super
-          rescue ValidationError => superve
-            ve = superve
-          end
-  
-          required_and_validate(ve, Properties::CONTEXT, context)
-  
-          raise ve if ve.has_errors?
-          true
+# frozen_string_literal: true
+
+require_relative '../core/notify'
+require_relative '../core/activity_streams2'
+
+module Coarnotify
+  module Patterns
+    # Pattern to represent an AnnounceRelationship notification
+    class AnnounceRelationship < Core::Notify::NotifyPattern
+      def self.type_constant
+        [Core::ActivityStreams2::ActivityStreamsTypes::ANNOUNCE, Core::Notify::NotifyTypes::RELATIONSHIP_ACTION]
+      end
+
+      # Custom getter to retrieve the object property as an AnnounceRelationshipObject
+      #
+      # @return [AnnounceRelationshipObject, nil] the object
+      def object
+        o = get_property(Core::ActivityStreams2::Properties::OBJECT)
+        if o
+          AnnounceRelationshipObject.new(stream: o, validate_stream_on_construct: false,
+                                         validate_properties: @validate_properties, validators: @validators,
+                                         validation_context: Core::ActivityStreams2::Properties::OBJECT,
+                                         properties_by_reference: @properties_by_reference)
         end
       end
-  
-      # Custom object class for Announce Relationship with special validation
-      class AnnounceRelationshipObject < NotifyObject
-        # Extends base validation with relationship-specific constraints:
-        # - Requires type property
-        # - Validates relationship triple components
-        #
-        # @return [Boolean] true if valid
-        # @raise [ValidationError] if validation fails
-        def validate
-          ve = ValidationError.new
-          begin
-            super
-          rescue ValidationError => superve
-            ve = superve
-          end
-  
-          required_and_validate(ve, Properties::TYPE, type)
-  
-          subject, relationship, obj = triple
-          required_and_validate(ve, Properties::SUBJECT_TRIPLE, subject)
-          required_and_validate(ve, Properties::RELATIONSHIP_TRIPLE, relationship)
-          required_and_validate(ve, Properties::OBJECT_TRIPLE, obj)
-  
-          raise ve if ve.has_errors?
-          true
+
+      # Set the object property of the notification
+      #
+      # @param value [AnnounceRelationshipObject] the object to set
+      def object=(value)
+        set_property(Core::ActivityStreams2::Properties::OBJECT, value.doc)
+      end
+
+      # Extends the base validation to make `context` required
+      #
+      # @return [Boolean] true if valid, otherwise raises ValidationError
+      def validate
+        ve = Core::Notify::ValidationError.new
+
+        begin
+          super
+        rescue Core::Notify::ValidationError => superve
+          ve = superve
         end
+
+        required_and_validate(ve, Core::ActivityStreams2::Properties::CONTEXT, context)
+
+        raise ve if ve.has_errors?
+        true
+      end
+    end
+
+    # Custom object class for Announce Relationship to apply the custom validation
+    class AnnounceRelationshipObject < Core::Notify::NotifyObject
+      # Extend the base validation to include the following constraints:
+      #
+      # * The object type is required and must validate
+      # * The as:subject property is required
+      # * The as:object property is required
+      # * The as:relationship property is required
+      #
+      # @return [Boolean] true if validation passes, otherwise raise a ValidationError
+      def validate
+        ve = Core::Notify::ValidationError.new
+
+        begin
+          super
+        rescue Core::Notify::ValidationError => superve
+          ve = superve
+        end
+
+        required_and_validate(ve, Core::ActivityStreams2::Properties::TYPE, type)
+        required_and_validate(ve, Core::ActivityStreams2::Properties::SUBJECT_TRIPLE, subject)
+        required_and_validate(ve, Core::ActivityStreams2::Properties::OBJECT_TRIPLE, object_triple)
+        required_and_validate(ve, Core::ActivityStreams2::Properties::RELATIONSHIP_TRIPLE, relationship)
+
+        raise ve if ve.has_errors?
+        true
       end
     end
   end
+end
