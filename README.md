@@ -168,7 +168,7 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/CottageLabs/coarnotifyrb.
+Bug reports and pull requests are welcome on GitHub at [https://github.com/CottageLabs/coarnotifyrb](https://github.com/coar-notify/coarnotifyrb).
 
 ## License
 
